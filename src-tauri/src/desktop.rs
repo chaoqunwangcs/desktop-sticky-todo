@@ -76,32 +76,65 @@ fn find_worker_w() -> Option<HWND> {
 
     unsafe extern "system" fn enum_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
         let finder = &mut *(lparam.0 as *mut WorkerFinder);
-        // For each top-level window, check if it hosts SHELLDLL_DefView.
-        let def_view = FindWindowExW(
-            Some(hwnd),
-            None,
-            windows::core::w!("SHELLDLL_DefView"),
-            None,
-        );
+
+        // Check if this top-level window has a SHELLDLL_DefView child.
+        let def_view = unsafe {
+            FindWindowExW(
+                Some(hwnd),
+                None,
+                windows::core::w!("SHELLDLL_DefView"),
+                None,
+            )
+        };
         if let Ok(def_view) = def_view {
             if !def_view.is_invalid() {
-                // The WorkerW we want is the next sibling after this one.
-                let worker =
-                    FindWindowExW(None, Some(hwnd), windows::core::w!("WorkerW"), None);
+                eprintln!("[embed] found SHELLDLL_DefView under HWND {:?}", hwnd);
+                // The WorkerW we want is the next sibling after this window.
+                let worker = unsafe {
+                    FindWindowExW(
+                        None,
+                        Some(hwnd),
+                        windows::core::w!("WorkerW"),
+                        None,
+                    )
+                };
                 if let Ok(worker) = worker {
                     if !worker.is_invalid() {
+                        eprintln!("[embed] found WorkerW {:?} as sibling", worker);
                         finder.found = Some(worker);
-                        return BOOL(0); // stop enumerating
+                        return BOOL(0); // stop
                     }
                 }
             }
         }
-        BOOL(1) // keep going
+        BOOL(1) // keep going — don't log errors for windows that don't have DefView
     }
 
     let lparam = LPARAM(finder_ptr as isize);
     unsafe {
         let _ = EnumWindows(Some(enum_proc), lparam);
+    }
+
+    if finder.found.is_none() {
+        eprintln!("[embed] enum finished, no WorkerW found via SHELLDLL_DefView method");
+        // Fallback: try finding WorkerW as a direct child of Progman.
+        unsafe {
+            if let Ok(progman) = FindWindowW(windows::core::w!("Progman"), None) {
+                if !progman.is_invalid() {
+                    if let Ok(worker) = FindWindowExW(
+                        Some(progman),
+                        None,
+                        windows::core::w!("WorkerW"),
+                        None,
+                    ) {
+                        if !worker.is_invalid() {
+                            eprintln!("[embed] found WorkerW {:?} as child of Progman", worker);
+                            finder.found = Some(worker);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     finder.found
@@ -128,33 +161,51 @@ fn hide_from_taskbar(hwnd: HWND) {
 /// already attached).
 pub fn attach_to_desktop(window: &WebviewWindow) -> bool {
     if ATTACHED.load(Ordering::SeqCst) {
+        eprintln!("[embed] already attached, skipping");
         return true;
     }
 
     let hwnd = match to_hwnd(window) {
-        Some(h) => h,
-        None => return false,
+        Some(h) => {
+            eprintln!("[embed] got HWND: {:?}", h);
+            h
+        }
+        None => {
+            eprintln!("[embed] failed to get HWND from window");
+            return false;
+        }
     };
 
     unsafe {
         let progman = match FindWindowW(windows::core::w!("Progman"), None) {
-            Ok(p) => p,
-            Err(_) => return false,
+            Ok(p) => {
+                eprintln!("[embed] found Progman: {:?}", p);
+                p
+            }
+            Err(e) => {
+                eprintln!("[embed] FindWindowW(Progman) failed: {}", e);
+                return false;
+            }
         };
         if progman.is_invalid() {
+            eprintln!("[embed] Progman HWND is invalid");
             return false;
         }
 
+        eprintln!("[embed] sending 0x052C to Progman...");
         spawn_worker_w(progman);
 
         match find_worker_w() {
             Some(worker) => {
-                let _ = SetParent(hwnd, Some(worker));
+                eprintln!("[embed] found WorkerW: {:?}", worker);
+                let result = SetParent(hwnd, Some(worker));
+                match result {
+                    Ok(prev) => eprintln!("[embed] SetParent(WorkerW) OK, prev parent: {:?}", prev),
+                    Err(e) => eprintln!("[embed] SetParent(WorkerW) FAILED: {}", e),
+                }
             }
             None => {
-                // Fallback: parent directly to Progman. Less ideal (icons may
-                // render on top of us) but keeps the widget on the desktop
-                // layer on builds where WorkerW refuses to spawn.
+                eprintln!("[embed] WorkerW not found, falling back to Progman parent");
                 let _ = SetParent(hwnd, Some(progman));
             }
         }
@@ -164,6 +215,7 @@ pub fn attach_to_desktop(window: &WebviewWindow) -> bool {
     }
 
     ATTACHED.store(true, Ordering::SeqCst);
+    eprintln!("[embed] attachment complete");
     true
 }
 
