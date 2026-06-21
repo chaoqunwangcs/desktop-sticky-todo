@@ -36,7 +36,7 @@ pub fn run() {
         .setup(|app| {
             // ── Tray ──────────────────────────────────────────────
             let toggle = MenuItem::with_id(app, "toggle", "显示/隐藏", true, None::<&str>)?;
-            let settings = MenuItem::with_id(app, "settings", "设置", true, None::<&str>)?;
+            let settings = MenuItem::with_id(app, "settings", "主控台", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&toggle, &settings, &quit])?;
 
@@ -152,12 +152,22 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let WindowEvent::CloseRequested { .. } = event {
-                let app = window.app_handle();
-                let label = window.label().to_string();
-                if let Some(wv) = app.get_webview_window(&label) {
-                    let _ = desktop::save_window_state(app.clone(), wv, label);
+            match event {
+                WindowEvent::CloseRequested { api, .. } => {
+                    let label = window.label().to_string();
+                    // Main window: hide instead of close so user can reopen from tray.
+                    if label == "main" {
+                        api.prevent_close();
+                        let _ = window.hide();
+                        return;
+                    }
+                    // Widget window: save state before closing.
+                    let app = window.app_handle();
+                    if let Some(wv) = app.get_webview_window(&label) {
+                        let _ = desktop::save_window_state(app.clone(), wv, label);
+                    }
                 }
+                _ => {}
             }
         })
         .run(tauri::generate_context!())

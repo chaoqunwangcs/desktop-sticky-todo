@@ -15,9 +15,9 @@ export default {
       },
       colors: {
         accent: {
-          DEFAULT: "#fbbf24",
-          soft: "#fcd34d",
-          deep: "#d97706",
+          DEFAULT: "rgb(var(--color-accent-rgb) / <alpha-value>)",
+          soft: "rgb(var(--color-accent-soft-rgb) / <alpha-value>)",
+          deep: "rgb(var(--color-accent-deep-rgb) / <alpha-value>)",
         },
       },
       animation: {

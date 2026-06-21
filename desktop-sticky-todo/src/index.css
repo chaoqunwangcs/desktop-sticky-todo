@@ -7,6 +7,12 @@
     box-sizing: border-box;
   }
 
+  :root {
+    --color-accent-rgb: 251 191 36;
+    --color-accent-soft-rgb: 252 211 77;
+    --color-accent-deep-rgb: 217 119 6;
+  }
+
   html,
   body,
   #root {

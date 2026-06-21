@@ -77,3 +77,33 @@ export function groupByDate(todos: Todo[]): Record<string, Todo[]> {
   }
   return out;
 }
+
+/** Convert a hex color (e.g. "#fbbf24") to RGB components string "251 191 36". */
+export function hexToRgb(hex: string): string {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `${r} ${g} ${b}`;
+}
+
+/** Derive soft (lighter) and deep (darker) RGB from a hex color. */
+export function accentRgbVariants(hex: string): { base: string; soft: string; deep: string } {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  // Soft: lighten by blending with white
+  const softR = Math.min(255, r + 40);
+  const softG = Math.min(255, g + 40);
+  const softB = Math.min(255, b + 40);
+  // Deep: darken by reducing
+  const deepR = Math.max(0, r - 60);
+  const deepG = Math.max(0, g - 60);
+  const deepB = Math.max(0, b - 60);
+  return {
+    base: `${r} ${g} ${b}`,
+    soft: `${softR} ${softG} ${softB}`,
+    deep: `${deepR} ${deepG} ${deepB}`,
+  };
+}

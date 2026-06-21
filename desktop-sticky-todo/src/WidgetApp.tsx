@@ -9,7 +9,7 @@ import { TitleBar } from "./components/TitleBar";
 import { TodoWidget } from "./components/TodoWidget";
 import { CalendarWidget } from "./components/CalendarWidget";
 import { useStore } from "./store";
-import { cn } from "./utils";
+import { cn, accentRgbVariants } from "./utils";
 
 export function WidgetApp() {
   const { view, settings, init, loaded } = useStore();
@@ -17,6 +17,14 @@ export function WidgetApp() {
   useEffect(() => {
     void init();
   }, [init]);
+
+  // Apply accent color CSS variables whenever settings change.
+  useEffect(() => {
+    const { base, soft, deep } = accentRgbVariants(settings.accentColor);
+    document.documentElement.style.setProperty("--color-accent-rgb", base);
+    document.documentElement.style.setProperty("--color-accent-soft-rgb", soft);
+    document.documentElement.style.setProperty("--color-accent-deep-rgb", deep);
+  }, [settings.accentColor]);
 
   // Listen for settings refresh from the main window.
   useEffect(() => {

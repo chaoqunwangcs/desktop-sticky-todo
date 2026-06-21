@@ -22,7 +22,7 @@ use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumWindows, FindWindowExW, FindWindowW, GetWindowLongW, SendMessageTimeoutW, SetParent,
     SetWindowLongW, ShowWindow, GWL_EXSTYLE, SMTO_NORMAL, SW_SHOW, WINDOW_LONG_PTR_INDEX,
-    WS_EX_TOOLWINDOW,
+    WS_EX_NOACTIVATE,
 };
 
 /// Undocumented message that asks `Progman` to spawn the `WorkerW` wallpaper
@@ -140,12 +140,13 @@ fn find_worker_w() -> Option<HWND> {
     finder.found
 }
 
-/// Strip the taskbar app-window style so the widget never shows up in the
-/// taskbar / Alt-Tab list even when re-parenting does not fully hide it.
-fn hide_from_taskbar(hwnd: HWND) {
+/// Mark the widget as non-activating so it stays on the desktop without
+/// stealing focus from other windows, but still receives mouse/keyboard input.
+/// Unlike WS_EX_TOOLWINDOW, WS_EX_NOACTIVATE does not block user interaction.
+fn mark_no_activate(hwnd: HWND) {
     unsafe {
         let ex = GetWindowLongW(hwnd, WINDOW_LONG_PTR_INDEX(GWL_EXSTYLE.0)) as u32;
-        let new_ex = (ex | WS_EX_TOOLWINDOW.0) as i32;
+        let new_ex = (ex | WS_EX_NOACTIVATE.0) as i32;
         let _ = SetWindowLongW(hwnd, WINDOW_LONG_PTR_INDEX(GWL_EXSTYLE.0), new_ex);
     }
 }
@@ -210,7 +211,7 @@ pub fn attach_to_desktop(window: &WebviewWindow) -> bool {
             }
         }
 
-        hide_from_taskbar(hwnd);
+        mark_no_activate(hwnd);
         let _ = ShowWindow(hwnd, SW_SHOW);
     }
 

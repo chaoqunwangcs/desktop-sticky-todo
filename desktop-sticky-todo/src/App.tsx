@@ -10,7 +10,7 @@ import { enable, isEnabled, disable } from "@tauri-apps/plugin-autostart";
 import { Palette, Eye, Power, Calendar, Monitor } from "lucide-react";
 import { useStore } from "./store";
 import type { ViewMode } from "./types";
-import { cn } from "./utils";
+import { cn, accentRgbVariants } from "./utils";
 
 const ACCENT_PRESETS = [
   "#fbbf24", // amber
@@ -30,6 +30,14 @@ export default function App() {
   useEffect(() => {
     void init();
   }, [init]);
+
+  // Apply accent color CSS variables.
+  useEffect(() => {
+    const { base, soft, deep } = accentRgbVariants(settings.accentColor);
+    document.documentElement.style.setProperty("--color-accent-rgb", base);
+    document.documentElement.style.setProperty("--color-accent-soft-rgb", soft);
+    document.documentElement.style.setProperty("--color-accent-deep-rgb", deep);
+  }, [settings.accentColor]);
 
   // Sync autostart with OS.
   useEffect(() => {
